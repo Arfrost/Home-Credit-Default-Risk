@@ -5,8 +5,8 @@ End-to-end credit default risk modelling system built as a graduation project.
 ## Team
 - [Arfrost] — ML pipeline, Optuna tuning
 - [Demir] — SQL feature engineering
-- [Berk] — Statistical EDA
-- [Ahmet + Arfrost] — Evaluation & Streamlit app
+- [berkw2b ] — Statistical EDA
+- [ahmet2224 + Arfrost] — Evaluation & Streamlit app
 
 ## Stack
 Python · DuckDB · scikit-learn · XGBoost · Optuna · SHAP · Streamlit . Boruta
