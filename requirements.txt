@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+xgboost
+optuna
+shap
+duckdb
+streamlit
+matplotlib
+seaborn
+scipy
+joblib
+category_encoders
+imbalanced-learn
+torch
