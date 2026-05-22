@@ -228,10 +228,15 @@ if __name__ == '__main__':
     with torch.no_grad():
         y_prob_ann = ann_model(X_t).squeeze().numpy()
     
+    # Compute the KS components directly right here
+    df_eval_ann = pd.DataFrame({'y': y_test, 'prob': y_prob_ann}).sort_values('prob', ascending=False).reset_index(drop=True)
+    cum_pos_ann = (df_eval_ann['y'] == 1).cumsum() / (df_eval_ann['y'] == 1).sum()
+    cum_neg_ann = (df_eval_ann['y'] == 0).cumsum() / (df_eval_ann['y'] == 0).sum()
+    
     ann_results = {
         'model': 'ANN',
         'auc': roc_auc_score(y_test, y_prob_ann),
-        'ks': 0,  # compute inline
+        'ks': float((cum_pos_ann - cum_neg_ann).abs().max()),  # Computed inline from the arrays above
         'gini': 2 * roc_auc_score(y_test, y_prob_ann) - 1
     }
     results.append(ann_results)

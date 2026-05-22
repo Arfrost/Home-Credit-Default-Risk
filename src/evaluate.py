@@ -1,3 +1,5 @@
+from src.train_tree import CreditRiskANN
+import sys
 import numpy as np
 import pandas as pd
 import json
@@ -10,7 +12,10 @@ from sklearn.metrics import (
     roc_auc_score, roc_curve, precision_recall_curve,
     confusion_matrix, classification_report
 )
-from src.preprocessing import get_tree_data, get_lr_svm_data, add_features, NEW_FEATURES
+import __main__
+__main__.CreditRiskANN = CreditRiskANN
+from src.preprocessing import get_tree_data,  add_features, NEW_FEATURES
+from src.train_lr_svm import get_lr_svm_data
 from src.config import RANDOM_STATE
 import os
 os.makedirs('reports', exist_ok=True)
@@ -121,9 +126,15 @@ def delong_test(y_true, y_prob1, y_prob2, model1_name, model2_name):
     print(f"  P-value     : {p:.4f}")
     print(f"  Significant : {'Yes' if p < 0.05 else 'No'} (α=0.05)")
 
-    return {'model1': model1_name, 'model2': model2_name,
-            'auc1': auc1, 'auc2': auc2, 'z': z, 'p': p,
-            'significant': p < 0.05}
+    return {
+        'model1': model1_name, 
+        'model2': model2_name,
+        'auc1': auc1, 
+        'auc2': auc2, 
+        'z': float(z), 
+        'p': float(p),
+        'significant': bool(p < 0.05)  # <-- Explicitly convert to standard Python bool
+    }
 
 # ── ROC Curve Plot ─────────────────────────────────────────────────────────────
 def plot_roc_curves(y_test, predictions_dict):
