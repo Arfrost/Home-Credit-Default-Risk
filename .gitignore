@@ -209,10 +209,7 @@ __marimo__/
 data/raw/
 data/processed/
 
-# Models - too large
-models/
-*.pkl
-*.joblib
+
 
 # Env
 .env
