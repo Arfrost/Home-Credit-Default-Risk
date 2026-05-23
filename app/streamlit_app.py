@@ -97,7 +97,7 @@ def risk_color(prob):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 st.sidebar.title("🏦 Credit Risk System")
-page = st.sidebar.radio("Navigation", ["Single Prediction", "Batch Prediction", "Model Info"])
+page = st.sidebar.radio("Navigation", ["Single Prediction", "Model Info"])
 
 # ── Page 1: Single Prediction ──────────────────────────────────────────────────
 if page == "Single Prediction":
