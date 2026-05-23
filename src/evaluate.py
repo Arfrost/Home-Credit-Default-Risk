@@ -212,6 +212,7 @@ if __name__ == '__main__':
         y_prob_ann = ann_model(X_test_ann).squeeze().numpy()
 
     # Full metrics
+    from sklearn.metrics import f1_score
     results = []
     results.append(full_metrics(y_test, y_prob_xgb, 'XGBoost'))
     thresholds = np.arange(0.1, 0.5, 0.01)
