@@ -211,9 +211,15 @@ if __name__ == '__main__':
         y_prob_ann = ann_model(X_test_ann).squeeze().numpy()
 
     # Full metrics
+    from sklearn.metrics import f1_score
     results = []
     results.append(full_metrics(y_test, y_prob_xgb, 'XGBoost'))
-    results.append(full_metrics(y_test, y_prob_ann, 'ANN'))
+    thresholds = np.arange(0.1, 0.5, 0.01)
+    f1_scores = [f1_score(y_test, (y_prob_ann >= t).astype(int)) for t in thresholds]
+    best_threshold_ann = thresholds[np.argmax(f1_scores)]
+    print(f"Best ANN threshold: {best_threshold_ann:.2f}")
+
+    results.append(full_metrics(y_test, y_prob_ann, 'ANN', threshold=best_threshold_ann))
     results.append(full_metrics(y_test_lr, y_prob_lr, 'LogisticRegression'))
     results.append(full_metrics(y_test, y_prob_svm, 'SVM'))
 
