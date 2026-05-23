@@ -17,6 +17,7 @@ warnings.filterwarnings('ignore')
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 from src.preprocessing import get_tree_data
 device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
+from src.preprocessing import CreditRiskANN
 # ── Paths ──────────────────────────────────────────────────────────────────────
 os.makedirs('models', exist_ok=True)
 RESULTS_PATH = 'models/tree_results.json'
@@ -93,25 +94,6 @@ def train_xgboost(n_trials=50):
     return model, study.best_params, study.best_value
 
 # ── 3. ANN ─────────────────────────────────────────────────────────────────────
-class CreditRiskANN(nn.Module):
-    def __init__(self, input_dim, hidden_layers, dropout_rate):
-        super().__init__()
-        layers = []
-        in_dim = input_dim
-        for hidden_dim in hidden_layers:
-            layers.extend([
-                nn.Linear(in_dim, hidden_dim),
-                nn.BatchNorm1d(hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(dropout_rate)
-            ])
-            in_dim = hidden_dim
-        layers.append(nn.Linear(in_dim, 1))
-        self.network = nn.Sequential(*layers)
-    
-    def forward(self, x):
-        return torch.sigmoid(self.network(x))
-
 def train_ann_trial(trial, X_tr, y_tr, X_val, y_val, input_dim):
     # Hyperparameters
     n_layers     = trial.suggest_int('n_layers', 2, 4)
@@ -213,8 +195,8 @@ if __name__ == '__main__':
     results = []
     
     # XGBoost
-    xgb_model, xgb_params, xgb_auc = train_xgboost(n_trials=50)
-    results.append(evaluate(xgb_model, X_test, y_test, 'XGBoost'))
+    #xgb_model, xgb_params, xgb_auc = train_xgboost(n_trials=50)
+    #results.append(evaluate(xgb_model, X_test, y_test, 'XGBoost'))
     
     
     # ANN

@@ -3,6 +3,27 @@ import os
 import json
 import pandas as pd
 import numpy as np
+import torch
+import torch.nn as nn
+
+class CreditRiskANN(nn.Module):
+    def __init__(self, input_dim, hidden_layers, dropout_rate):
+        super().__init__()
+        layers = []
+        in_dim = input_dim
+        for hidden_dim in hidden_layers:
+            layers.extend([
+                nn.Linear(in_dim, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout_rate)
+            ])
+            in_dim = hidden_dim
+        layers.append(nn.Linear(in_dim, 1))
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return torch.sigmoid(self.network(x))
 
 DATA_PATH    = PROCESSED_DIR + 'df_model.parquet'
 FEATURE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'feature_sets.json')
