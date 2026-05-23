@@ -56,24 +56,31 @@ explainer = load_explainer()
 
 # ── Helper ─────────────────────────────────────────────────────────────────────
 def predict_all(input_df):
+    # Capture raw structural variables for safety logic before engineering transformations
+    raw_income = input_df['AMT_INCOME_TOTAL'].iloc[0]
+    raw_credit = input_df['AMT_CREDIT'].iloc[0]
+    raw_ext_1  = input_df['EXT_SOURCE_1'].iloc[0]
+    raw_ext_2  = input_df['EXT_SOURCE_2'].iloc[0]
+    raw_ext_3  = input_df['EXT_SOURCE_3'].iloc[0]
+
     df = add_features(input_df.copy())
     for col in NEW_FEATURES:
         if col not in df.columns:
             df[col] = 0
         df[col] = df[col].fillna(0)
 
-    # XGBoost
+    # XGBoost Inference
     X_xgb    = df[feature_sets['full'] + NEW_FEATURES].fillna(0)
     prob_xgb = xgb_model.predict_proba(X_xgb)[0, 1]
 
-    # LR
+    # Logistic Regression Inference
     lr_new   = [f for f in NEW_FEATURES if f not in
                 ['EXT_SOURCE_1x2','EXT_SOURCE_2x3','EXT_SOURCE_1x3']]
     X_lr     = df[feature_sets['lr_only'] + lr_new].fillna(0)
     X_lr_s   = lr_bundle['scaler'].transform(X_lr)
     prob_lr  = lr_bundle['model'].predict_proba(X_lr_s)[0, 1]
 
-    # ANN
+    # Artificial Neural Network Inference
     X_ann    = df[feature_sets['full'] + NEW_FEATURES].fillna(0)
     X_ann_s  = ann_bundle['scaler'].transform(X_ann)
     ann_bundle['model'].eval()
@@ -82,11 +89,23 @@ def predict_all(input_df):
             torch.FloatTensor(X_ann_s)
         ).squeeze().item()
 
-    # Credit Score from LR
+    # Credit Score derivation via Logistic Regression log-odds
     FACTOR = 20 / np.log(2)
     OFFSET = 600
     log_odds = lr_bundle['model'].intercept_[0] + X_lr_s.dot(lr_bundle['model'].coef_[0])
     score = int(-FACTOR * log_odds[0] + OFFSET)
+
+    # ── Hard Business Rule Guards (Risk Policy Layer) ──
+    # Condition 1: Catastrophic Loan-to-Income Exposure (e.g. Asking for more than 15x annual salary)
+    is_toxic_debt = (raw_credit / max(raw_income, 1)) > 15
+    
+    # Condition 2: Absolute structural blindness (All external bureaus reporting strict 0.00 values)
+    is_zero_history = (raw_ext_1 == 0.0 and raw_ext_2 == 0.0 and raw_ext_3 == 0.0)
+
+    if is_toxic_debt or is_zero_history:
+        prob_xgb = max(prob_xgb, 0.958)  # Intercept and force tree models to show high risk
+        prob_ann = max(prob_ann, 0.951)  # Intercept and force saturated ANN layers to show high risk
+        score = min(score, 350)          # Permanently tank the financial credit score metric
 
     return prob_xgb, prob_lr, prob_ann, score, X_xgb
 
@@ -97,6 +116,7 @@ def risk_color(prob):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 st.sidebar.title("🏦 Credit Risk System")
+# Cleaned: "Batch Prediction" option removed entirely from selection UI
 page = st.sidebar.radio("Navigation", ["Single Prediction", "Model Info"])
 
 # ── Page 1: Single Prediction ──────────────────────────────────────────────────
@@ -195,7 +215,6 @@ if page == "Single Prediction":
         st.pyplot(fig)
         plt.close()
 
-
 # ── Page 2: Model Info ─────────────────────────────────────────────────────────
 elif page == "Model Info":
     st.title("Model Performance Summary")
@@ -208,9 +227,12 @@ elif page == "Model Info":
     ]
 
     df_results = pd.DataFrame(results)
-    st.dataframe(df_results.style.highlight_max(
-        subset=['AUC','KS','Gini','Recall'],color='#1B4D3E'
-    ), use_container_width=True)
+    # Formatted to use deep forest green (#1B4D3E) cleanly for dark-mode interfaces
+    st.dataframe(
+        df_results.style.highlight_max(subset=['AUC','KS','Gini','Recall'], color='#1B4D3E')
+                        .format(precision=4), 
+        use_container_width=True
+    )
 
     st.subheader("Top 15 Features (SHAP)")
     shap_data = [
@@ -232,7 +254,7 @@ elif page == "Model Info":
     ]
     st.dataframe(pd.DataFrame(shap_data), use_container_width=True)
 
-    # Convert the static report asset queries into absolute paths to prevent cloud asset drops
+    # Asset checks via system independent absolute structures
     st.subheader("ROC Curves")
     roc_path = PROJECT_ROOT / "reports" / "roc_curves.png"
     if roc_path.exists():
