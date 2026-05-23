@@ -195,62 +195,8 @@ if page == "Single Prediction":
         st.pyplot(fig)
         plt.close()
 
-# ── Page 2: Batch Prediction ───────────────────────────────────────────────────
-elif page == "Batch Prediction":
-    st.title("Batch Risk Assessment")
-    st.markdown("Upload a CSV file to score multiple applicants at once.")
 
-    uploaded = st.file_uploader("Upload CSV", type=['csv'])
-
-    if uploaded:
-        df_batch = pd.read_csv(uploaded)
-        st.write(f"Loaded {len(df_batch):,} applicants")
-        st.dataframe(df_batch.head())
-
-        if st.button("Score All Applicants", type="primary"):
-            with st.spinner("Scoring..."):
-                df_out = add_features(df_batch.copy())
-                for col in NEW_FEATURES:
-                    if col not in df_out.columns:
-                        df_out[col] = 0
-                    df_out[col] = df_out[col].fillna(0)
-
-                all_features = feature_sets['full'] + NEW_FEATURES
-                X = df_out.reindex(columns=all_features, fill_value=0)
-                probs = xgb_model.predict_proba(X)[:, 1]
-
-                df_batch['default_probability'] = probs
-                df_batch['risk_label'] = pd.cut(
-                    probs, bins=[0, 0.3, 0.6, 1.0],
-                    labels=['Low Risk', 'Medium Risk', 'High Risk']
-                )
-
-                lr_new = [f for f in NEW_FEATURES if f not in
-                          ['EXT_SOURCE_1x2','EXT_SOURCE_2x3','EXT_SOURCE_1x3']]
-                X_lr   = df_out.reindex(columns=feature_sets['lr_only'] + lr_new, fill_value=0)
-                X_lr_s = lr_bundle['scaler'].transform(X_lr)
-                FACTOR = 20 / np.log(2)
-                log_odds = lr_bundle['model'].intercept_[0] + X_lr_s.dot(lr_bundle['model'].coef_[0])
-                df_batch['credit_score'] = (-FACTOR * log_odds + 600).astype(int)
-
-            st.success(f"Scored {len(df_batch):,} applicants")
-            st.dataframe(df_batch[['default_probability', 'risk_label', 'credit_score']].head(20))
-
-            fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-            axes[0].hist(probs, bins=50, color='#4C9BE8', edgecolor='white')
-            axes[0].set_title('Default Probability Distribution')
-            axes[0].set_xlabel('Probability')
-            axes[1].bar(['Low Risk', 'Medium Risk', 'High Risk'],
-                       df_batch['risk_label'].value_counts().reindex(['Low Risk','Medium Risk','High Risk'], fill_value=0),
-                       color=['#2ECC71','#F39C12','#E84C4C'])
-            axes[1].set_title('Risk Category Distribution')
-            st.pyplot(fig)
-            plt.close()
-
-            csv = df_batch.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Scored CSV", csv, "scored_applicants.csv", "text/csv")
-
-# ── Page 3: Model Info ─────────────────────────────────────────────────────────
+# ── Page 2: Model Info ─────────────────────────────────────────────────────────
 elif page == "Model Info":
     st.title("Model Performance Summary")
 
@@ -263,7 +209,7 @@ elif page == "Model Info":
 
     df_results = pd.DataFrame(results)
     st.dataframe(df_results.style.highlight_max(
-        subset=['AUC','KS','Gini','Recall'], color='#d4edda'
+        subset=['AUC','KS','Gini','Recall'],color='#1B4D3E'
     ), use_container_width=True)
 
     st.subheader("Top 15 Features (SHAP)")
