@@ -8,9 +8,22 @@ import shap
 import matplotlib.pyplot as plt
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.preprocessing import add_features, NEW_FEATURES,CreditRiskANN
-from src.config import MODEL_DIR
+from pathlib import Path
+
+# ── Dynamic Path Configuration ────────────────────────────────────────────────
+# Get the absolute path of the directory containing this file (app/)
+CURRENT_DIR = Path(__file__).resolve().parent
+# Go up one level to the project root directory
+PROJECT_ROOT = CURRENT_DIR.parent
+
+# Safely inject the project root into sys.path to resolve internal src imports
+sys.path.append(str(PROJECT_ROOT))
+
+from src.preprocessing import add_features, NEW_FEATURES, CreditRiskANN
+
+# Define robust absolute paths for your assets
+MODELS_DIR_PATH = PROJECT_ROOT / "models"
+FEATURE_SETS_JSON_PATH = PROJECT_ROOT / "src" / "feature_sets.json"
 
 # ── Page Config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -22,11 +35,14 @@ st.set_page_config(
 # ── Load Models ────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_models():
-    xgb_model  = joblib.load(f'{MODEL_DIR}xgboost.joblib')
-    lr_bundle  = joblib.load(f'{MODEL_DIR}logistic_regression.joblib')
-    ann_bundle = joblib.load(f'{MODEL_DIR}ann.joblib')
-    with open('src/feature_sets.json') as f:
+    # Use cross-platform path joining to completely prevent directory string mismatches
+    xgb_model  = joblib.load(MODELS_DIR_PATH / "xgboost.joblib")
+    lr_bundle  = joblib.load(MODELS_DIR_PATH / "logistic_regression.joblib")
+    ann_bundle = joblib.load(MODELS_DIR_PATH / "ann.joblib")
+    
+    with open(FEATURE_SETS_JSON_PATH) as f:
         feature_sets = json.load(f)
+        
     return xgb_model, lr_bundle, ann_bundle, feature_sets
 
 xgb_model, lr_bundle, ann_bundle, feature_sets = load_models()
@@ -119,7 +135,6 @@ if page == "Single Prediction":
         REGION_RATING_CLIENT_W_CITY = st.selectbox("Region Rating", [1, 2, 3])
 
     if st.button("🔍 Assess Risk", type="primary", use_container_width=True):
-        # Build input row
         input_data = {
             'AMT_INCOME_TOTAL': AMT_INCOME_TOTAL,
             'AMT_CREDIT': AMT_CREDIT,
@@ -142,7 +157,6 @@ if page == "Single Prediction":
             'CNT_FAM_MEMBERS': 2,
         }
 
-        # Fill missing features with 0
         all_features = list(set(feature_sets['full'] + feature_sets['lr_only'] + NEW_FEATURES))
         for feat in all_features:
             if feat not in input_data:
@@ -153,7 +167,6 @@ if page == "Single Prediction":
         with st.spinner("Computing risk assessment..."):
             prob_xgb, prob_lr, prob_ann, score, X_xgb = predict_all(input_df)
 
-        # Results
         st.markdown("---")
         st.subheader("Risk Assessment Results")
 
@@ -166,7 +179,6 @@ if page == "Single Prediction":
 
         st.markdown(f"### {emoji} Overall Assessment: **{label}**")
 
-        # SHAP waterfall
         st.subheader("Feature Contributions (SHAP)")
         shap_vals = explainer.shap_values(X_xgb)
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -213,7 +225,6 @@ elif page == "Batch Prediction":
                     labels=['Low Risk', 'Medium Risk', 'High Risk']
                 )
 
-                # Credit scores
                 lr_new = [f for f in NEW_FEATURES if f not in
                           ['EXT_SOURCE_1x2','EXT_SOURCE_2x3','EXT_SOURCE_1x3']]
                 X_lr   = df_out.reindex(columns=feature_sets['lr_only'] + lr_new, fill_value=0)
@@ -225,21 +236,19 @@ elif page == "Batch Prediction":
             st.success(f"Scored {len(df_batch):,} applicants")
             st.dataframe(df_batch[['default_probability', 'risk_label', 'credit_score']].head(20))
 
-            # Distribution
             fig, axes = plt.subplots(1, 2, figsize=(12, 4))
             axes[0].hist(probs, bins=50, color='#4C9BE8', edgecolor='white')
             axes[0].set_title('Default Probability Distribution')
             axes[0].set_xlabel('Probability')
             axes[1].bar(['Low Risk', 'Medium Risk', 'High Risk'],
-                       df_batch['risk_label'].value_counts()[['Low Risk','Medium Risk','High Risk']],
+                       df_batch['risk_label'].value_counts().reindex(['Low Risk','Medium Risk','High Risk'], fill_value=0),
                        color=['#2ECC71','#F39C12','#E84C4C'])
             axes[1].set_title('Risk Category Distribution')
             st.pyplot(fig)
             plt.close()
 
             csv = df_batch.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Scored CSV", csv,
-                             "scored_applicants.csv", "text/csv")
+            st.download_button("Download Scored CSV", csv, "scored_applicants.csv", "text/csv")
 
 # ── Page 3: Model Info ─────────────────────────────────────────────────────────
 elif page == "Model Info":
@@ -277,10 +286,13 @@ elif page == "Model Info":
     ]
     st.dataframe(pd.DataFrame(shap_data), use_container_width=True)
 
+    # Convert the static report asset queries into absolute paths to prevent cloud asset drops
     st.subheader("ROC Curves")
-    if os.path.exists('reports/roc_curves.png'):
-        st.image('reports/roc_curves.png')
+    roc_path = PROJECT_ROOT / "reports" / "roc_curves.png"
+    if roc_path.exists():
+        st.image(str(roc_path))
 
     st.subheader("SHAP Feature Importance")
-    if os.path.exists('reports/shap/shap_beeswarm.png'):
-        st.image('reports/shap/shap_beeswarm.png')
+    shap_img_path = PROJECT_ROOT / "reports" / "shap" / "shap_beeswarm.png"
+    if shap_img_path.exists():
+        st.image(str(shap_img_path))
